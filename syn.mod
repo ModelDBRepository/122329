@@ -3,7 +3,35 @@ TITLE Fluctuating conductances
 COMMENT
 -----------------------------------------------------------------------------
 
-chris deister: This mod file was written by A. Destexhe (thank you), I used and modified the file to approximate a noisy leak conductance. So I got rid of inhibition (g_i) etc. resulting in only one conductance not two. std_e and tau_e were controlled by me in the sim and usually set to 0.001 and 5, respectively and is set in the hoc files. 
+chris deister: This mod file was written by A. Destexhe (thank you), I
+used and modified the file to approximate a noisy leak conductance. So
+I got rid of inhibition (g_i) etc. resulting in only one conductance
+not two. std_e and tau_e were controlled by me in the sim and usually
+set to 0.001 and 5, respectively and is set in the hoc files.
+
+20101021 ModelDB Administrator: Ted Carnevale identified three bugs
+in the BREAKPOINT block.  One bug would have affected simulations 
+run with tau_e == 0.  The second bug was "latent" i.e. it would 
+only emerge if a naive fix were applied to the first bug--
+in which case it would cause simulations run with tau_e == 0 to be 
+wildly incorrect.  The third bug was that, under certain conditions, 
+a minor range variable would not be updated at each fadvance.  
+All three bugs have now been fixed.
+
+Also note that the current and conductance units in this mechanism 
+are all "absolute" i.e. not density units.  This is because the original 
+implementation by Destexhe was as a POINT_PROCESS, but the authors are
+using it here as a density mechanism without having converted to density
+units.  In its present form the mechanism works in the sense that 
+it can produce valid simulations.  However, its current and conductance 
+values should be interpreted as having density units, i.e. mA/cm2 and S/cm2,
+respectively.  In other words, the net current delivered by the mechanism 
+to any compartment is the product of the numerical value of its i 
+(interpreted as mA/cm2) and the compartment surface area (in cm2).  
+Likewise, the net conductance presented by this mechanism to any 
+compartment is the product of its ge (interpreted as S/cm2) and the 
+compartment surface area.  See ModelDB for the author's
+original version of syn.mod.
 
 	Fluctuating conductance model for synaptic bombardment
 	======================================================
@@ -110,6 +138,7 @@ ASSIGNED {
 	D_e	(umho umho /ms) : excitatory diffusion coefficient
 	exp_e
 	amp_e	(umho)
+	xtemp	(1)
 }
 
 INITIAL {
@@ -123,21 +152,20 @@ INITIAL {
 }
 
 BREAKPOINT {
-	SOLVE oup
-	if(tau_e==0) {
-	   g_e = std_e * normrand(0,1)
-	}
-	g_e = g_e0 + g_e1
-	i = g_e * (v - E_e) 
+  SOLVE oup
+  i = g_e * (v - E_e)
 }
 
-
-PROCEDURE oup() {		: use Scop function normrand(mean, std_dev)
-   if(tau_e!=0) {
-	g_e1 =  exp_e * g_e1 + amp_e * normrand(0,1)
-   }
+PROCEDURE oup() {
+  xtemp = normrand(0,1)
+  if(tau_e==0) {
+    g_e1 = std_e * xtemp
+    g_e = g_e1
+  } else {
+    g_e1 = exp_e * g_e1 + amp_e * xtemp
+    g_e = g_e0 + g_e1
+  }
 }
-
 
 PROCEDURE new_seed(seed) {		: procedure to set the seed
 	set_seed(seed)
@@ -145,4 +173,3 @@ PROCEDURE new_seed(seed) {		: procedure to set the seed
 	  printf("Setting random generator with seed = %g\n", _lseed);
 	ENDVERBATIM
 }
-
